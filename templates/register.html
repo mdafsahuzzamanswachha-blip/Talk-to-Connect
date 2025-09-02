@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>TC Chat - Register</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body class="auth">
+  <div class="auth-card">
+    <h2>Create account</h2>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <form method="POST" action="/register">
+      <label>Name</label>
+      <input type="text" name="username" placeholder="Your name" required />
+      <label>Email</label>
+      <input type="email" name="email" placeholder="you@gmail.com" required />
+      <label>Password</label>
+      <input type="password" name="password" placeholder="min 6 chars" required />
+      <button type="submit">Sign up</button>
+    </form>
+    <p class="muted">Have an account? <a href="/login">Login</a></p>
+  </div>
+</body>
+</html>
+
