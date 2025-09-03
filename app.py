@@ -1,6 +1,8 @@
 import os
 from datetime import datetime
 from uuid import uuid4
+from collections import defaultdict
+
 from flask import Flask, render_template, request, redirect, url_for, jsonify, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -22,7 +24,7 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", "sqlite:///cha
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "static/uploads")
-ALLOWED_EXTENSIONS = set((os.getenv("ALLOWED_EXTENSIONS", "pdf,doc,docx,jpg,jpeg,png,txt")).split(","))
+ALLOWED_EXTENSIONS = set(ext.strip().lower() for ext in os.getenv("ALLOWED_EXTENSIONS", "pdf,doc,docx,jpg,jpeg,png,txt").split(","))
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 db.init_app(app)
@@ -33,22 +35,27 @@ login_manager.login_view = "login"
 socketio = SocketIO(app, cors_allowed_origins="*")  # Allow all origins for dev
 
 # Presence tracking
-ONLINE = {}
+ONLINE = {}  # user_id -> connection count
+USER_SIDS = defaultdict(set)  # user_id -> set of sids
+
 
 def dm_room(a_id: int, b_id: int) -> str:
     a, b = sorted([int(a_id), int(b_id)])
     return f"dm:{a}:{b}"
 
+
 def call_room(a_id: int, b_id: int) -> str:
     a, b = sorted([int(a_id), int(b_id)])
     return f"call:{a}:{b}"
+
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+
 # -----------------------
-# Auth routes
+# Auth pages (HTML)
 # -----------------------
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -63,6 +70,7 @@ def login():
             return redirect(url_for("index"))
         return render_template("login.html", error="Invalid credentials")
     return render_template("login.html")
+
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -81,11 +89,38 @@ def register():
         return redirect(url_for("login"))
     return render_template("register.html")
 
+
 @app.route("/logout")
 @login_required
 def logout():
     logout_user()
     return redirect(url_for("login"))
+
+
+# -----------------------
+# Auth APIs (JSON for auth.js)
+# -----------------------
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    data = request.get_json(silent=True) or {}
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "")
+    user = User.query.filter_by(email=email).first()
+    if user and check_password_hash(user.password, password):
+        login_user(user)
+        user.last_seen = datetime.utcnow()
+        db.session.commit()
+        # Using server-side session cookie via Flask-Login; no JWT returned
+        return jsonify({"ok": True, "user_id": user.id, "username": user.username})
+    return jsonify({"error": "Invalid credentials"}), 401
+
+
+@app.route("/api/logout", methods=["POST"])
+@login_required
+def api_logout():
+    logout_user()
+    return jsonify({"ok": True})
+
 
 # -----------------------
 # App pages
@@ -97,6 +132,14 @@ def index():
     online_ids = set(ONLINE.keys())
     return render_template("index.html", users=users, online_ids=online_ids)
 
+
+# Optional: /chat route for front-end redirects
+@app.route("/chat")
+@login_required
+def chat_redirect():
+    return redirect(url_for("index"))
+
+
 @app.route("/call/<int:user_id>/<call_type>")
 @login_required
 def call_page(user_id, call_type):
@@ -104,6 +147,7 @@ def call_page(user_id, call_type):
         abort(404)
     peer = User.query.get_or_404(user_id)
     return render_template("call.html", peer=peer, call_type=call_type)
+
 
 # -----------------------
 # API endpoints
@@ -122,6 +166,7 @@ def api_messages(other_id):
         .limit(200)
         .all()
     )
+
     def serialize(m: Message):
         return {
             "id": m.id,
@@ -131,10 +176,13 @@ def api_messages(other_id):
             "file_url": m.file_url,
             "created_at": m.created_at.isoformat() + "Z",
         }
+
     return jsonify([serialize(m) for m in msgs])
+
 
 def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 @app.route("/upload", methods=["POST"])
 @login_required
@@ -166,7 +214,22 @@ def upload():
         "created_at": msg.created_at.isoformat() + "Z",
     }
     socketio.emit("new_message", payload, room=room)
+    # Also emit directly to receiver's sids in case they haven't joined the DM room
+    for sid in USER_SIDS.get(other_id, []):
+        socketio.emit("new_message", payload, to=sid)
     return jsonify({"ok": True, "message": payload})
+
+
+@app.route("/api/last_seen/<int:user_id>")
+@login_required
+def api_last_seen(user_id):
+    user = User.query.get_or_404(user_id)
+    online = user_id in ONLINE and ONLINE[user_id] > 0
+    return jsonify({
+        "status": "online" if online else "offline",
+        "last_seen": user.last_seen.isoformat() + "Z" if user.last_seen else None
+    })
+
 
 # -----------------------
 # Socket.IO events
@@ -177,19 +240,39 @@ def on_connect():
         return False
     uid = int(current_user.id)
     ONLINE[uid] = ONLINE.get(uid, 0) + 1
+    USER_SIDS[uid].add(request.sid)
     User.query.filter_by(id=uid).update({"last_seen": datetime.utcnow()})
     db.session.commit()
     emit("presence", {"user_id": uid, "status": "online"}, broadcast=True)
+
 
 @socketio.on("disconnect")
 def on_disconnect():
     if not current_user.is_authenticated:
         return
     uid = int(current_user.id)
+    # Remove sid mapping
+    USER_SIDS[uid].discard(request.sid)
+    if not USER_SIDS[uid]:
+        USER_SIDS.pop(uid, None)
+    # Decrement connection count
     ONLINE[uid] = max(0, ONLINE.get(uid, 1) - 1)
     if ONLINE[uid] == 0:
         ONLINE.pop(uid, None)
         emit("presence", {"user_id": uid, "status": "offline"}, broadcast=True)
+
+
+@socketio.on("set_online")
+def on_set_online(data):
+    # Optional event from client after reconnect; presence is already handled in connect
+    if not current_user.is_authenticated:
+        return
+    uid = int(current_user.id)
+    ONLINE[uid] = max(ONLINE.get(uid, 0), 1)
+    User.query.filter_by(id=uid).update({"last_seen": datetime.utcnow()})
+    db.session.commit()
+    emit("presence", {"user_id": uid, "status": "online"}, broadcast=True)
+
 
 @socketio.on("join_dm")
 def on_join_dm(data):
@@ -198,12 +281,17 @@ def on_join_dm(data):
     join_room(room)
     emit("joined_dm", {"room": room})
 
+
 @socketio.on("typing")
 def on_typing(data):
     other_id = int(data.get("other_id"))
     is_typing = bool(data.get("typing"))
     room = dm_room(current_user.id, other_id)
     emit("typing", {"from": current_user.id, "typing": is_typing}, room=room, include_self=False)
+    # Also target receiver directly in case they aren't in the room
+    for sid in USER_SIDS.get(other_id, []):
+        socketio.emit("typing", {"from": current_user.id, "typing": is_typing}, to=sid)
+
 
 @socketio.on("send_message")
 def on_send_message(data):
@@ -224,17 +312,37 @@ def on_send_message(data):
         "created_at": msg.created_at.isoformat() + "Z",
     }
     emit("new_message", payload, room=room)
+    # Directly to receiver if not in room
+    for sid in USER_SIDS.get(other_id, []):
+        socketio.emit("new_message", payload, to=sid)
 
-# Call events
+
+# -----------------------
+# Calling and WebRTC signaling
+# -----------------------
 @socketio.on("call_user")
 def on_call_user(data):
     other_id = int(data.get("other_id"))
     call_type = data.get("call_type", "video")
-    emit("incoming_call", {
+    # Optional logging
+    try:
+        log = CallLog(caller_id=current_user.id, receiver_id=other_id, call_type=call_type, started_at=datetime.utcnow())
+        db.session.add(log)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    # Notify callee
+    payload = {
         "from_id": current_user.id,
         "from_name": current_user.username,
         "call_type": call_type
-    }, room=dm_room(current_user.id, other_id))
+    }
+    # DM room (if both are there)
+    emit("incoming_call", payload, room=dm_room(current_user.id, other_id))
+    # Directly to callee's sids
+    for sid in USER_SIDS.get(other_id, []):
+        socketio.emit("incoming_call", payload, to=sid)
+
 
 @socketio.on("webrtc_join")
 def on_webrtc_join(data):
@@ -243,23 +351,64 @@ def on_webrtc_join(data):
     join_room(room)
     emit("webrtc_peer_joined", {"user_id": current_user.id}, room=room, include_self=False)
 
+
 @socketio.on("webrtc_offer")
 def on_webrtc_offer(data):
-    other_id = int(data.get("other_id"))
+    other_id = int(data.get("to"))
+    offer = data.get("offer")
+    call_type = data.get("type", "video")
+    # Send via call room (if used)
     room = call_room(current_user.id, other_id)
-    emit("webrtc_offer", {"sdp": data.get("sdp"), "from": current_user.id}, room=room, include_self=False)
+    emit("webrtc_offer", {"offer": offer, "from": current_user.id, "type": call_type}, room=room, include_self=False)
+    # Also directly to callee sids to avoid room dependency
+    for sid in USER_SIDS.get(other_id, []):
+        socketio.emit("webrtc_offer", {"offer": offer, "from": current_user.id, "type": call_type}, to=sid)
+
 
 @socketio.on("webrtc_answer")
 def on_webrtc_answer(data):
-    other_id = int(data.get("other_id"))
+    other_id = int(data.get("to"))
+    answer = data.get("answer")
     room = call_room(current_user.id, other_id)
-    emit("webrtc_answer", {"sdp": data.get("sdp"), "from": current_user.id}, room=room, include_self=False)
+    emit("webrtc_answer", {"answer": answer, "from": current_user.id}, room=room, include_self=False)
+    for sid in USER_SIDS.get(other_id, []):
+        socketio.emit("webrtc_answer", {"answer": answer, "from": current_user.id}, to=sid)
+
 
 @socketio.on("webrtc_ice_candidate")
 def on_webrtc_ice_candidate(data):
-    other_id = int(data.get("other_id"))
+    other_id = int(data.get("to"))
+    candidate = data.get("candidate")
     room = call_room(current_user.id, other_id)
-    emit("webrtc_ice_candidate", {"candidate": data.get("candidate"), "from": current_user.id}, room=room, include_self=False)
+    emit("webrtc_ice_candidate", {"candidate": candidate, "from": current_user.id}, room=room, include_self=False)
+    for sid in USER_SIDS.get(other_id, []):
+        socketio.emit("webrtc_ice_candidate", {"candidate": candidate, "from": current_user.id}, to=sid)
+
+
+@socketio.on("end_call")
+def on_end_call(data):
+    other_id = int(data.get("to"))
+    # Notify the other side
+    emit("end_call", {"from": current_user.id}, room=call_room(current_user.id, other_id), include_self=False)
+    for sid in USER_SIDS.get(other_id, []):
+        socketio.emit("end_call", {"from": current_user.id}, to=sid)
+    # Optional: record end time on the latest log between these users
+    try:
+        log = (CallLog.query
+               .filter(
+                   db.or_(
+                       db.and_(CallLog.caller_id == current_user.id, CallLog.receiver_id == other_id),
+                       db.and_(CallLog.caller_id == other_id, CallLog.receiver_id == current_user.id),
+                   )
+               )
+               .order_by(CallLog.started_at.desc())
+               .first())
+        if log and not log.ended_at:
+            log.ended_at = datetime.utcnow()
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
 
 # -----------------------
 # Bootstrap
@@ -268,7 +417,11 @@ def on_webrtc_ice_candidate(data):
 def update_last_seen():
     if current_user.is_authenticated:
         current_user.last_seen = datetime.utcnow()
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
 
 # ✅ Auto-create DB tables on first run
 with app.app_context():
