@@ -6,6 +6,9 @@ const socket = io({
     reconnection: true
 });
 
+let currentChatUserId = null;
+const typingEl = document.getElementById('typing');
+
 // =======================
 // Presence Handling
 // =======================
@@ -19,34 +22,21 @@ function updateSidebarStatus(userId, status) {
 }
 
 function updateChatHeaderStatus(userId, status) {
-    const chatNameEl = document.getElementById('chat-name');
     const chatStatusEl = document.getElementById('chat-status');
-    const activePerson = document.querySelector(`.person[data-user-id="${userId}"]`);
-    if (chatNameEl && chatStatusEl && activePerson) {
-        if (chatNameEl.textContent.trim() === activePerson.querySelector('.name').textContent.trim()) {
-            chatStatusEl.textContent = status === 'online' ? 'Active now' : 'Offline';
-            chatStatusEl.className = `status ${status}`;
-        }
+    if (currentChatUserId === userId && chatStatusEl) {
+        chatStatusEl.textContent = status === 'online' ? 'Active now' : 'Offline';
+        chatStatusEl.className = `status ${status}`;
     }
 }
 
-// Initial online users
-if (window.INIT_ONLINE && Array.isArray(window.INIT_ONLINE)) {
-    window.INIT_ONLINE.forEach(id => updateSidebarStatus(id, 'online'));
-}
-
-// Listen for presence events
-socket.on('presence', data => {
-    const { user_id, status } = data;
+socket.on('presence', ({ user_id, status }) => {
     updateSidebarStatus(user_id, status);
     updateChatHeaderStatus(user_id, status);
 });
 
 // =======================
-// Messaging
+// Load conversation
 // =======================
-let currentChatUserId = null;
-
 document.querySelectorAll('.person').forEach(person => {
     person.addEventListener('click', () => {
         currentChatUserId = parseInt(person.dataset.userId);
@@ -54,21 +44,18 @@ document.querySelectorAll('.person').forEach(person => {
         document.getElementById('chat-avatar').querySelector('img').src = person.querySelector('img').src;
         document.getElementById('messages').innerHTML = '<div class="placeholder">Loading...</div>';
 
-        // Join DM room
         socket.emit('join_dm', { other_id: currentChatUserId });
 
-        // Fetch messages
         fetch(`/api/messages/${currentChatUserId}`)
             .then(res => res.json())
             .then(msgs => {
                 const messagesEl = document.getElementById('messages');
                 messagesEl.innerHTML = '';
                 msgs.forEach(m => appendMessage(m, m.sender_id === window.CURRENT_USER_ID));
+                scrollMessagesToBottom();
             });
 
-        // Enable call buttons
-        document.getElementById('audio-call').disabled = false;
-        document.getElementById('video-call').disabled = false;
+        updateLastSeen(currentChatUserId);
     });
 });
 
@@ -82,32 +69,44 @@ function appendMessage(msg, isOwn) {
         div.textContent = msg.content;
     }
     messagesEl.appendChild(div);
+}
+
+function scrollMessagesToBottom() {
+    const messagesEl = document.getElementById('messages');
     messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-// Send message
-document.getElementById('send').addEventListener('click', () => {
+// =======================
+// Sending messages
+// =======================
+document.getElementById('send').addEventListener('click', sendMessage);
+document.getElementById('msg').addEventListener('keypress', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
+
+function sendMessage() {
     const textArea = document.getElementById('msg');
     const content = textArea.value.trim();
     if (!content || !currentChatUserId) return;
-
     socket.emit('send_message', { other_id: currentChatUserId, content });
     textArea.value = '';
-});
+}
 
 // Receive message
 socket.on('new_message', msg => {
     if (msg.sender_id === currentChatUserId || msg.receiver_id === currentChatUserId) {
         appendMessage(msg, msg.sender_id === window.CURRENT_USER_ID);
+        scrollMessagesToBottom();
     }
 });
 
 // =======================
 // Typing Indicator
 // =======================
-const typingEl = document.getElementById('typing');
 let typingTimeout;
-
 document.getElementById('msg').addEventListener('input', () => {
     if (!currentChatUserId) return;
     socket.emit('typing', { other_id: currentChatUserId, typing: true });
@@ -119,7 +118,7 @@ document.getElementById('msg').addEventListener('input', () => {
 
 socket.on('typing', data => {
     if (data.from === currentChatUserId) {
-        typingEl.textContent = data.typing ? 'Typing...' : '';
+        typingEl.textContent = data.typing ? 'Typing…' : '';
     }
 });
 
@@ -151,6 +150,7 @@ document.getElementById('file-input').addEventListener('change', e => {
             const res = JSON.parse(xhr.responseText);
             if (res.message) {
                 appendMessage(res.message, true);
+                scrollMessagesToBottom();
             }
         }
     };
@@ -168,14 +168,11 @@ function updateLastSeen(userId) {
             const chatStatusEl = document.getElementById('chat-status');
             if (data.status === 'online') {
                 chatStatusEl.textContent = 'Active now';
-            } else {
-                chatStatusEl.textContent = `Last seen: ${data.last_seen}`;
+            } else if (data.last_seen) {
+                chatStatusEl.textContent = `Last seen: ${new Date(data.last_seen).toLocaleString()}`;
             }
         });
 }
-
-// Optional: call this when opening a chat
-// updateLastSeen(currentChatUserId);
 
 // =======================
 // Reconnect Handling
