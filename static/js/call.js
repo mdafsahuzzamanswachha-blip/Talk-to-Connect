@@ -1,18 +1,15 @@
-// =======================
-// CALL.JS
-// =======================
 let localStream;
 let peerConnection;
 const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 // Start call
 async function startCall(type = 'video') {
+    if (!currentChatUserId) return;
     try {
         localStream = await navigator.mediaDevices.getUserMedia({
             video: type === 'video',
             audio: true
         });
-
         document.getElementById('localVideo').srcObject = localStream;
 
         peerConnection = new RTCPeerConnection(servers);
@@ -24,7 +21,7 @@ async function startCall(type = 'video') {
 
         peerConnection.onicecandidate = event => {
             if (event.candidate) {
-                socket.emit('webrtc_ice_candidate', { candidate: event.candidate });
+                socket.emit('webrtc_ice_candidate', { candidate: event.candidate, to: currentChatUserId });
             }
         };
 
@@ -54,7 +51,7 @@ socket.on('webrtc_offer', async ({ offer, from, type }) => {
 
     peerConnection.onicecandidate = event => {
         if (event.candidate) {
-            socket.emit('webrtc_ice_candidate', { candidate: event.candidate });
+            socket.emit('webrtc_ice_candidate', { candidate: event.candidate, to: from });
         }
     };
 
@@ -81,17 +78,4 @@ socket.on('webrtc_ice_candidate', async ({ candidate }) => {
 // End call
 function endCall() {
     if (peerConnection) {
-        peerConnection.close();
-        peerConnection = null;
-    }
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-    }
-    document.getElementById('localVideo').srcObject = null;
-    document.getElementById('remoteVideo').srcObject = null;
-    socket.emit('end_call', { to: currentChatUserId });
-}
-
-socket.on('end_call', () => {
-    endCall();
-});
+        peerConnection.close
