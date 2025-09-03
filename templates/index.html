@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>TC Chat</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body class="chat">
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="pill"><span></span><span></span><span></span></div>
+        <h1>TC Chat</h1>
+      </div>
+      <div class="me">
+        <div class="avatar"><img src="{{ current_user.avatar }}" alt="me" /></div>
+        <div class="meta">
+          <div class="name">{{ current_user.username }}</div>
+          <div class="email">{{ current_user.email }}</div>
+        </div>
+        <a class="logout" href="/logout">Logout</a>
+      </div>
+      <div class="search">
+        <input id="search" type="text" placeholder="Search people" />
+      </div>
+      <div id="people" class="people">
+        {% for u in users %}
+        <div class="person" data-user-id="{{ u.id }}">
+          <div class="avatar"><img src="{{ u.avatar }}" alt="{{ u.username }}" /></div>
+          <div class="info">
+            <div class="top">
+              <span class="name">{{ u.username }}</span>
+              {% if u.id in online_ids %}
+                <span class="badge active">Active</span>
+              {% else %}
+                <span class="badge idle">Offline</span>
+              {% endif %}
+            </div>
+            <div class="preview">Click to chat</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </aside>
+
+    <main class="conversation">
+      <div class="conv-header">
+        <div class="left">
+          <div class="avatar" id="chat-avatar"><img src="/static/images/default.png" alt="user" /></div>
+          <div class="meta">
+            <div class="name" id="chat-name">Select a contact</div>
+            <div class="status" id="chat-status"></div>
+          </div>
+        </div>
+        <div class="right">
+          <button id="audio-call" class="btn" disabled>Audio</button>
+          <button id="video-call" class="btn" disabled>Video</button>
+        </div>
+      </div>
+
+      <div id="messages" class="messages">
+        <div class="placeholder">Pick someone from the left to start chatting.</div>
+      </div>
+
+      <div class="composer">
+        <form id="file-form">
+          <input type="hidden" name="receiver_id" id="file-receiver" />
+          <label class="attach">
+            📎
+            <input type="file" id="file-input" name="file" />
+          </label>
+        </form>
+        <textarea id="msg" rows="1" placeholder="Type a message"></textarea>
+        <button id="send" class="send">➤</button>
+      </div>
+      <div id="typing" class="typing"></div>
+    </main>
+  </div>
+
+  <script>
+    window.CURRENT_USER_ID = {{ current_user.id }};
+    window.INIT_ONLINE = {{ online_ids | list }};
+  </script>
+  <script src="/static/js/chat.js"></script>
+</body>
+</html>
+
