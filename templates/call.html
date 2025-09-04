@@ -1,44 +1,19 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Call - TC Chat</title>
-  <link rel="stylesheet" href="/static/css/style.css" />
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <meta charset="UTF-8" />
+  <title>Talkto Call</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body class="call">
-  <div class="call-wrap">
-    <header class="call-header">
-      <div class="who">
-        <div class="avatar"><img src="{{ peer.avatar }}" alt="{{ peer.username }}"></div>
-        <div>
-          <div class="name">{{ peer.username }}</div>
-          <div class="type">{{ call_type|capitalize }} call</div>
-        </div>
-      </div>
-      <div class="actions">
-        <button id="toggle-mic">Mic</button>
-        {% if call_type == 'video' %}<button id="toggle-cam">Cam</button>{% endif %}
-        <button id="hangup" class="danger" onclick="endCall()">End</button>
-      </div>
-    </header>
-
-    <div class="videos {% if call_type == 'audio' %}audio-only{% endif %}">
-      <video id="localVideo" autoplay playsinline muted></video>
-      <video id="remoteVideo" autoplay playsinline></video>
-      {% if call_type == 'audio' %}
-        <div class="audio-visual">🔊 Connected</div>
-      {% endif %}
-    </div>
+  <div class="call-container">
+    <h2>Talkto Video Call</h2>
+    <video id="localVideo" autoplay muted></video>
+    <video id="remoteVideo" autoplay></video>
+    <button id="startCall">Start Call</button>
+    <button id="endCall">End Call</button>
   </div>
-
-  <script>
-    window.CALL_PEER_ID = {{ peer.id }};
-    window.CALL_TYPE = "{{ call_type }}";
-    window.CURRENT_USER_ID = {{ current_user.id }};
-    // Auto-start when page opens
-    window.addEventListener('load', () => { startCall("{{ call_type }}"); });
-  </script>
-  <script src="/static/js/call.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="{{ url_for('static', filename='call.js') }}"></script>
 </body>
 </html>
