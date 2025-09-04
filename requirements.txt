@@ -1,4 +1,4 @@
-# Core Flask
+# Core
 Flask>=3.0.3,<4.0
 Flask-SQLAlchemy>=3.1.1,<4.0
 Flask-Login>=0.6.3,<1.0
@@ -6,20 +6,16 @@ Flask-Migrate>=4.0.7,<5.0
 Flask-Cors>=4.0.0,<5.0
 Flask-SocketIO>=5.3.6,<6.0
 
-# Async servers for WebSockets
+# WebSockets (use eventlet on Render)
 eventlet>=0.33.0,<1.0
 
-# Security
+# DB (SQLite or Postgres)
+psycopg2-binary>=2.9.9,<3.0
+
+# Security & env
 bcrypt>=4.1.3,<5.0
 python-dotenv>=1.0.1,<2.0
 Werkzeug>=3.0.3,<4.0
 
-# Deployment
+# Deploy
 gunicorn>=21.2.0,<22.0
-
-# Optional dev/test tools
-pytest>=7.4.0,<8.0
-pytest-flask>=1.2.0,<2.0
-black>=23.3.0,<24.0
-isort>=6.0.0,<7.0
-mypy>=1.4.0,<2.0
