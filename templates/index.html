@@ -2,86 +2,51 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Talkto Connect</title>
-
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-
-  <!-- Tailwind CSS -->
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Custom CSS -->
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
-<body class="bg-gray-900 text-gray-100 font-inter h-screen flex">
-  <!-- Sidebar -->
-  <aside class="w-64 bg-gray-800 p-4 flex flex-col">
-    <h2 class="text-xl font-bold mb-6">Talkto Connect 💬</h2>
-    <nav class="flex-1 space-y-3">
-      <button class="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
-        <span>🏠</span> Home
-      </button>
-      <button class="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-700 transition">
-        <span>👥</span> Friends
-      </button>
-      <button class="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-700 transition">
-        <span>⚙️</span> Settings
-      </button>
-    </nav>
-    <button id="logout-btn" class="mt-6 px-3 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition">
-      Logout
-    </button>
-  </aside>
-
-  <!-- Main Chat -->
-  <main class="flex-1 flex flex-col">
-    <!-- Chat Header -->
-    <header class="p-4 border-b border-gray-700 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold">
-          T
-        </div>
-        <div>
-          <h3 class="font-semibold">Talkto Bot</h3>
-          <p class="text-sm text-gray-400">Online</p>
-        </div>
+<body class="bg-gray-900 text-gray-100 font-[Inter] h-screen">
+  <div class="h-full grid grid-cols-12">
+    <!-- Sidebar -->
+    <aside class="col-span-3 lg:col-span-2 border-r border-gray-800 p-4 overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-lg font-semibold">Talkto Connect</h1>
+        <a href="/logout" class="text-sm text-red-400 hover:underline">Logout</a>
       </div>
-      <div class="flex gap-3">
-        <button class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg">📞 Call</button>
-        <button class="px-3 py-2 bg-green-600 hover:bg-green-500 rounded-lg">🎥 Video</button>
-      </div>
-    </header>
+      <ul id="users-list" class="space-y-1">
+        {% for u in users %}
+          <li class="flex items-center gap-2 p-2 rounded hover:bg-gray-800 cursor-pointer" data-uid="{{ u.id }}">
+            <span class="w-2.5 h-2.5 rounded-full status {% if u.id in online_ids %}online{% else %}offline{% endif %}"></span>
+            <img src="{{ u.avatar }}" class="w-6 h-6 rounded-full" alt="{{ u.username }}" />
+            <span class="text-sm">{{ u.username }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </aside>
 
-    <!-- Chat Messages -->
-    <div id="chat-box" class="flex-1 p-4 space-y-3 overflow-y-auto bg-gray-900">
-      <!-- Example message -->
-      <div class="flex items-start gap-3">
-        <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white">T</div>
-        <div class="bg-gray-800 px-4 py-2 rounded-xl max-w-sm">
-          <p>Hello! 👋 Welcome to Talkto Connect.</p>
-        </div>
-      </div>
-    </div>
+    <!-- Chat area -->
+    <main class="col-span-9 lg:col-span-10 flex flex-col">
+      <header class="h-14 border-b border-gray-800 flex items-center px-4">
+        <div class="text-sm text-gray-400" id="typing-bar" style="visibility:hidden;">Typing…</div>
+      </header>
 
-    <!-- Chat Input -->
-    <form id="chat-form" class="p-4 flex gap-2 border-t border-gray-700 bg-gray-800">
-      <input 
-        type="text" 
-        id="chat-input" 
-        placeholder="Type a message..." 
-        autocomplete="off" 
-        class="flex-1 px-4 py-2 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
-      <button 
-        type="submit" 
-        class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-medium transition"
-      >
-        Send
-      </button>
-    </form>
-  </main>
+      <section id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-900"></section>
 
-  <script src="chat.js"></script>
+      <form id="chat-form" class="h-16 border-t border-gray-800 flex items-center gap-2 px-4">
+        <input id="chat-input" type="text" placeholder="Type a message…" autocomplete="off"
+               class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500" />
+        <button type="submit" class="px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-500">Send</button>
+      </form>
+    </main>
+  </div>
+
+  <script>
+    window.CURRENT_USER_ID = {{ current_user.id }};
+  </script>
+  <script src="/static/js/chat.js"></script>
 </body>
 </html>
