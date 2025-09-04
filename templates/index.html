@@ -4,21 +4,83 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Talkto Connect</title>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Custom CSS -->
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
-  <div class="chat-container">
-    <header>
-      <h1>Talkto Connect 💬</h1>
+<body class="bg-gray-900 text-gray-100 font-inter h-screen flex">
+  <!-- Sidebar -->
+  <aside class="w-64 bg-gray-800 p-4 flex flex-col">
+    <h2 class="text-xl font-bold mb-6">Talkto Connect 💬</h2>
+    <nav class="flex-1 space-y-3">
+      <button class="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition">
+        <span>🏠</span> Home
+      </button>
+      <button class="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-700 transition">
+        <span>👥</span> Friends
+      </button>
+      <button class="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-700 transition">
+        <span>⚙️</span> Settings
+      </button>
+    </nav>
+    <button id="logout-btn" class="mt-6 px-3 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition">
+      Logout
+    </button>
+  </aside>
+
+  <!-- Main Chat -->
+  <main class="flex-1 flex flex-col">
+    <!-- Chat Header -->
+    <header class="p-4 border-b border-gray-700 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold">
+          T
+        </div>
+        <div>
+          <h3 class="font-semibold">Talkto Bot</h3>
+          <p class="text-sm text-gray-400">Online</p>
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <button class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg">📞 Call</button>
+        <button class="px-3 py-2 bg-green-600 hover:bg-green-500 rounded-lg">🎥 Video</button>
+      </div>
     </header>
-    <div class="chat-box" id="chat-box">
-      <!-- Messages will appear here -->
+
+    <!-- Chat Messages -->
+    <div id="chat-box" class="flex-1 p-4 space-y-3 overflow-y-auto bg-gray-900">
+      <!-- Example message -->
+      <div class="flex items-start gap-3">
+        <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white">T</div>
+        <div class="bg-gray-800 px-4 py-2 rounded-xl max-w-sm">
+          <p>Hello! 👋 Welcome to Talkto Connect.</p>
+        </div>
+      </div>
     </div>
-    <form id="chat-form">
-      <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off" />
-      <button type="submit">Send</button>
+
+    <!-- Chat Input -->
+    <form id="chat-form" class="p-4 flex gap-2 border-t border-gray-700 bg-gray-800">
+      <input 
+        type="text" 
+        id="chat-input" 
+        placeholder="Type a message..." 
+        autocomplete="off" 
+        class="flex-1 px-4 py-2 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <button 
+        type="submit" 
+        class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-medium transition"
+      >
+        Send
+      </button>
     </form>
-  </div>
+  </main>
 
   <script src="chat.js"></script>
 </body>
