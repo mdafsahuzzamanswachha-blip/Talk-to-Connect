@@ -1,1 +1,4 @@
+Flask
+Flask-SocketIO
 eventlet
+Flask-SQLAlchemy
