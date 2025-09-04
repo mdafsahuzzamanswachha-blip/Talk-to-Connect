@@ -1,11 +1,71 @@
-/* Dark theme helpers for bubbles used in chat.js */
-.msg-row { display:flex; margin: 6px 0; }
-.msg-row.mine { justify-content: flex-end; }
-.msg-row .bubble {
-  background:#2b2f36; color:#e6e6e6; padding:10px 12px; border-radius:12px; max-width:70%;
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #121212;
+  color: #f1f1f1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
 }
-.msg-row.mine .bubble { background:#2563eb; color:white; }
 
-.status { display:inline-block; }
-.status.online { background:#22c55e; }
-.status.offline { background:#64748b; }
+.chat-container {
+  width: 100%;
+  max-width: 500px;
+  background-color: #1e1e1e;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
+}
+
+header {
+  background-color: #272727;
+  padding: 15px;
+  text-align: center;
+  font-size: 1.2em;
+  border-bottom: 1px solid #333;
+}
+
+.chat-box {
+  height: 400px;
+  overflow-y: auto;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.message {
+  background-color: #333;
+  padding: 10px;
+  border-radius: 8px;
+  max-width: 80%;
+}
+
+.message.user {
+  align-self: flex-end;
+  background-color: #0078d4;
+  color: white;
+}
+
+form {
+  display: flex;
+  border-top: 1px solid #333;
+}
+
+input[type="text"] {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background-color: #1e1e1e;
+  color: white;
+  font-size: 1em;
+}
+
+button {
+  padding: 10px 20px;
+  background-color: #0078d4;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
