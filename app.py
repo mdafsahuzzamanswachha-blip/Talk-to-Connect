@@ -1,50 +1,96 @@
-from flask import Flask, render_template, request, redirect, url_for, session
-from flask_socketio import SocketIO, emit, join_room, leave_room
+# models.py
+from datetime import datetime
+import enum
+
 from flask_sqlalchemy import SQLAlchemy
-import os
+from flask_login import UserMixin
+from sqlalchemy import Enum as SAEnum
 
-app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'devkey')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///chat.db')
-db = SQLAlchemy(app)
-socketio = SocketIO(app)
+db = SQLAlchemy()
 
-from models import User, Message
 
-@app.route('/')
-def index():
-    if 'user_id' in session:
-        return render_template('index.html')
-    return redirect(url_for('login'))
+class CallTypeEnum(enum.Enum):
+    AUDIO = "audio"
+    VIDEO = "video"
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        user = User.query.filter_by(username=request.form['username']).first()
-        if user and user.password == request.form['password']:
-            session['user_id'] = user.id
-            return redirect(url_for('index'))
-    return render_template('login.html')
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        user = User(username=request.form['username'], password=request.form['password'])
-        db.session.add(user)
-        db.session.commit()
-        return redirect(url_for('login'))
-    return render_template('register.html')
+class User(UserMixin, db.Model):
+    __tablename__ = "user"
 
-@app.route('/call')
-def call():
-    return render_template('call.html')
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(150), unique=True, nullable=False, index=True)
+    username = db.Column(db.String(50), nullable=False)
+    password = db.Column(db.String(255), nullable=False)
+    avatar = db.Column(db.String(255), nullable=True, default="/static/images/default.png")
+    last_seen = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
 
-@socketio.on('send_message')
-def handle_message(data):
-    msg = Message(username=data['username'], content=data['message'])
-    db.session.add(msg)
-    db.session.commit()
-    emit('receive_message', data, broadcast=True)
+    # relationships
+    sent_messages = db.relationship(
+        "Message",
+        backref="sender",
+        foreign_keys="Message.sender_id",
+        lazy="dynamic",
+        cascade="all, delete-orphan",
+    )
+    received_messages = db.relationship(
+        "Message",
+        backref="receiver",
+        foreign_keys="Message.receiver_id",
+        lazy="dynamic",
+        cascade="all, delete-orphan",
+    )
+    calls_made = db.relationship(
+        "CallLog",
+        backref="caller",
+        foreign_keys="CallLog.caller_id",
+        lazy="dynamic",
+        cascade="all, delete-orphan",
+    )
+    calls_received = db.relationship(
+        "CallLog",
+        backref="callee",
+        foreign_keys="CallLog.receiver_id",
+        lazy="dynamic",
+        cascade="all, delete-orphan",
+    )
 
-if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=10000)
+    def __repr__(self):
+        return f"<User {self.id} {self.username}>"
+
+
+class Message(db.Model):
+    __tablename__ = "message"
+
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    receiver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    content = db.Column(db.Text, nullable=True)           # text message
+    file_url = db.Column(db.String(300), nullable=True)   # optional attachment URL
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "sender_id": self.sender_id,
+            "receiver_id": self.receiver_id,
+            "content": self.content,
+            "file_url": self.file_url,
+            "created_at": self.created_at.isoformat() + "Z",
+        }
+
+    def __repr__(self):
+        return f"<Message {self.id} {self.sender_id}->{self.receiver_id}>"
+
+
+class CallLog(db.Model):
+    __tablename__ = "call_log"
+
+    id = db.Column(db.Integer, primary_key=True)
+    caller_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    receiver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    call_type = db.Column(SAEnum(CallTypeEnum), nullable=False)
+    started_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    ended_at = db.Column(db.DateTime, nullable=True)
+
+    def __repr__(self):
+        return f"<CallLog {self.id} {self.caller_id}->{self.receiver_id} {self.call_type.value}>"
