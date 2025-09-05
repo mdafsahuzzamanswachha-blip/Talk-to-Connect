@@ -1,1 +1,57 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
 
+# Virtual environment
+.venv/
+env/
+venv/
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+eggs/
+*.egg-info/
+.eggs/
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Flask / SQLAlchemy specific
+instance/
+*.db
+*.sqlite3
+
+# Environment variables
+.env
+.env.*
+
+# IDE / editor
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Node (if any frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Render / deployment
+*.log
+.cache/
