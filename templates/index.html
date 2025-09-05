@@ -1,14 +1,22 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Chat</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <meta charset="UTF-8">
+  <title>Chat - TC</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
 </head>
 <body>
-  <div id="chat-box"></div>
-  <input id="message-input" placeholder="Type a message..." />
-  <button onclick="sendMessage()">Send</button>
-  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-  <script src="/static/chat.js"></script>
+  <div class="chat-container">
+    <h2>Welcome, {{ user.username }}</h2>
+    <div id="chat-box" class="chat-box"></div>
+    <form id="chat-form">
+      <input id="message-input" type="text" placeholder="Type a message..." required>
+      <button type="submit">Send</button>
+    </form>
+    <a href="{{ url_for('logout') }}">Logout</a>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 </body>
 </html>
