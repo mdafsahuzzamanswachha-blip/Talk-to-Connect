@@ -1,12 +1,37 @@
-<!DOCTYPE html>
-<html>
-<head><title>Login</title></head>
-<body>
-  <form method="POST">
-    <input name="username" placeholder="Username" required />
-    <input name="password" type="password" placeholder="Password" required />
-    <button type="submit">Login</button>
-  </form>
-  <a href="/register">Register</a>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TC Chat - Login</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body class="auth">
+  <div class="auth-card">
+    <h2>Welcome back</h2>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="error">
+          {% for msg in messages %}
+            <p>{{ msg }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    
+    <form method="POST" action="{{ url_for('login') }}">
+      <label for="email">Email</label>
+      <input type="email" name="email" placeholder="you@gmail.com" required />
+
+      <label for="password">Password</label>
+      <input type="password" name="password" placeholder="Your password" required />
+
+      <button type="submit">Login</button>
+    </form>
+    
+    <p class="muted">
+      New here? <a href="{{ url_for('register') }}">Create an account</a>
+    </p>
+  </div>
 </body>
 </html>
