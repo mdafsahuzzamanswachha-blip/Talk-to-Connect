@@ -1,96 +1,100 @@
-# models.py
-from datetime import datetime
-import enum
+# app.py
+import eventlet
+eventlet.monkey_patch()
 
+import os
+from flask import Flask, render_template, redirect, url_for, request, flash
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import UserMixin
-from sqlalchemy import Enum as SAEnum
+from flask_login import (
+    LoginManager, login_user, logout_user,
+    login_required, current_user
+)
+from flask_socketio import SocketIO, emit, join_room, leave_room
+from werkzeug.security import generate_password_hash, check_password_hash
 
-db = SQLAlchemy()
+from models import db, User, Message
 
+# ----------------- App Setup -----------------
+app = Flask(__name__)
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "super-secret-key")
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", "sqlite:///chat.db")
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-class CallTypeEnum(enum.Enum):
-    AUDIO = "audio"
-    VIDEO = "video"
+db.init_app(app)
 
+login_manager = LoginManager(app)
+login_manager.login_view = "login"
 
-class User(UserMixin, db.Model):
-    __tablename__ = "user"
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(150), unique=True, nullable=False, index=True)
-    username = db.Column(db.String(50), nullable=False)
-    password = db.Column(db.String(255), nullable=False)
-    avatar = db.Column(db.String(255), nullable=True, default="/static/images/default.png")
-    last_seen = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+# ----------------- User Loader -----------------
+@login_manager.user_loader
+def load_user(user_id):
+    return db.session.get(User, int(user_id))
 
-    # relationships
-    sent_messages = db.relationship(
-        "Message",
-        backref="sender",
-        foreign_keys="Message.sender_id",
-        lazy="dynamic",
-        cascade="all, delete-orphan",
+# ----------------- Routes -----------------
+@app.route("/")
+@login_required
+def index():
+    return render_template("index.html", user=current_user)
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form.get("email")
+        password = request.form.get("password")
+        user = User.query.filter_by(email=email).first()
+        if user and check_password_hash(user.password, password):
+            login_user(user)
+            return redirect(url_for("index"))
+        flash("Invalid credentials", "danger")
+    return render_template("login.html")
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        username = request.form.get("username")
+        email = request.form.get("email")
+        password = request.form.get("password")
+
+        if User.query.filter_by(email=email).first():
+            flash("Email already registered", "warning")
+        else:
+            user = User(
+                username=username,
+                email=email,
+                password=generate_password_hash(password)
+            )
+            db.session.add(user)
+            db.session.commit()
+            login_user(user)
+            return redirect(url_for("index"))
+    return render_template("register.html")
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for("login"))
+
+# ----------------- Socket.IO -----------------
+@socketio.on("send_message")
+def handle_message(data):
+    msg = Message(
+        sender_id=current_user.id,
+        receiver_id=data["receiver_id"],
+        content=data["message"]
     )
-    received_messages = db.relationship(
-        "Message",
-        backref="receiver",
-        foreign_keys="Message.receiver_id",
-        lazy="dynamic",
-        cascade="all, delete-orphan",
-    )
-    calls_made = db.relationship(
-        "CallLog",
-        backref="caller",
-        foreign_keys="CallLog.caller_id",
-        lazy="dynamic",
-        cascade="all, delete-orphan",
-    )
-    calls_received = db.relationship(
-        "CallLog",
-        backref="callee",
-        foreign_keys="CallLog.receiver_id",
-        lazy="dynamic",
-        cascade="all, delete-orphan",
-    )
+    db.session.add(msg)
+    db.session.commit()
 
-    def __repr__(self):
-        return f"<User {self.id} {self.username}>"
+    emit("receive_message", {
+        "sender": current_user.username,
+        "message": data["message"]
+    }, broadcast=True)
 
-
-class Message(db.Model):
-    __tablename__ = "message"
-
-    id = db.Column(db.Integer, primary_key=True)
-    sender_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
-    receiver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
-    content = db.Column(db.Text, nullable=True)           # text message
-    file_url = db.Column(db.String(300), nullable=True)   # optional attachment URL
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
-
-    def serialize(self):
-        return {
-            "id": self.id,
-            "sender_id": self.sender_id,
-            "receiver_id": self.receiver_id,
-            "content": self.content,
-            "file_url": self.file_url,
-            "created_at": self.created_at.isoformat() + "Z",
-        }
-
-    def __repr__(self):
-        return f"<Message {self.id} {self.sender_id}->{self.receiver_id}>"
-
-
-class CallLog(db.Model):
-    __tablename__ = "call_log"
-
-    id = db.Column(db.Integer, primary_key=True)
-    caller_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
-    receiver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
-    call_type = db.Column(SAEnum(CallTypeEnum), nullable=False)
-    started_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
-    ended_at = db.Column(db.DateTime, nullable=True)
-
-    def __repr__(self):
-        return f"<CallLog {self.id} {self.caller_id}->{self.receiver_id} {self.call_type.value}>"
+# ----------------- Run -----------------
+if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
+    socketio.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
