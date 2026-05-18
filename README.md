@@ -1,70 +1,55 @@
-# FireVerse
+# Talk to Connect
 
-A full-feature messenger clone built with React and Firebase
-
-<p align="center">
-  <img alt="Stars" src="https://badgen.net/github/stars/napthedev/fireverse">
-  <img alt="Forks" src="https://badgen.net/github/forks/napthedev/fireverse">
-  <img alt="Issues" src="https://badgen.net/github/issues/napthedev/fireverse">
-  <img alt="Commits" src="https://badgen.net/github/commits/napthedev/fireverse">
-</p>
-
-## Live demo
-
-Official Website: [https://fireverse.pages.dev](https://fireverse.pages.dev)
+A full-feature messenger clone built with React and Firebase.
 
 ## Main technology used
 
-- react, typescript, tailwind
-- firebase (auth, firestore, storage)
-- zustand
-- emoji-mart
+- React, TypeScript, Tailwind CSS
+- Firebase (Authentication, Firestore, Cloud Storage)
+- Zustand (State Management)
+- Emoji-mart
 
 ## Features
 
 - Sign in with Google, Facebook
-- Create conversations (personally, group)
-- Allow sending
+- Create conversations (Personal & Group)
+- Allow sending:
   - Text
   - Image
   - File
-  - Stickers (from zalo)
-  - Gif (from giph
-  - Emoji (emoji-mart)
-- Show if user has seen message
-- Drop file to upload
-- Paste image from clipboard
-- Send reactions to message (like, love, care, haha, wow, sad, angry)
-- Unsent message
-- Reply message
-- Change conversation settings
-  - Change group theme, image
-  - Change theme
-- View conversation images, files
-- Detect link an add an anchor to it
+  - Stickers
+  - Gif
+  - Emoji
+- Show if user has seen messages
+- Drop file to upload & Paste image from clipboard
+- Send reactions to messages (like, love, care, haha, wow, sad, angry)
+- Unsent & Reply messages
+- Change conversation settings (Group theme, image, name)
+- View conversation images and shared files
+- Automatic link detection
 
-## Installation
+## Installation & Setup
 
-- Clone the project
-- Run `npm install`
-- Create your own firebase project
-  - Enable auth (google, facebook)
-  - Enable cloud firestore
-  - Enable firebase storage
-- Create your own giphy developer account
-- Example .env file:
+1. **Clone the project:**
+   ```bash
+   git clone [https://github.com/mdafsahuzzamanswachha-blip/talk-to-connect.git](https://github.com/mdafsahuzzamanswachha-blip/talk-to-connect.git)
+   cd talk-to-connect
 
-```env
-VITE_FIREBASE_CONFIG={"apiKey":"","authDomain":"","projectId":"","storageBucket":"","messagingSenderId":"","appId":""}
-VITE_GIPHY_API_KEY=your_api_key
-```
+    Install dependencies:
+    Bash
 
-## Previews
+    npm install
 
-![Preview 1](https://res.cloudinary.com/naptest/image/upload/v1644039987/fireverse/preview-1_yujhpl.png)
-![Preview 2](https://res.cloudinary.com/naptest/image/upload/v1644039987/fireverse/preview-2_qlxjjf.png)
-![Preview 3](https://res.cloudinary.com/naptest/image/upload/v1644039986/fireverse/preview-3_tgqahb.png)
+    Firebase Configuration:
 
-## Summary
+        Create your own Firebase project via Firebase Console.
 
-👉 If you like this project, give it a star ✨ and share 👨🏻‍💻 it to your friends 👈
+        Enable Authentication (Google, Facebook).
+
+        Enable Cloud Firestore and Firebase Storage.
+
+        Add your keys to Render's Environment Variables as VITE_FIREBASE_CONFIG.
+
+Summary
+
+👉 If you like this project, give it a star ✨ and share 👨🏻‍💻 it with your friends! 👈
